@@ -1232,36 +1232,46 @@ def get_device_sm():
     return 0
 
 
+import subprocess
+import re
+from jtop import jtop # Import the jtop library
+
 def get_nvgpu_memory_capacity():
+    """
+    Retrieves the total available memory capacity for the GPU on Jetson Tegra Orin.
+    This uses jtop to get the total system RAM, as the iGPU on Jetson shares system memory.
+
+    Returns:
+        float: The total memory capacity in MB.
+
+    Raises:
+        RuntimeError: If jetson-stats (jtop) cannot be accessed or provides no memory data.
+    """
     try:
-        # Run nvidia-smi and capture the output
-        result = subprocess.run(
-            ["nvidia-smi", "--query-gpu=memory.total", "--format=csv,noheader,nounits"],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-        )
+        with jtop() as jetson:
+            # Check if jtop has successfully initialized and is providing stats
+            if not jetson.ok():
+                raise RuntimeError("jetson-stats (jtop) is not running or accessible.")
 
-        if result.returncode != 0:
-            raise RuntimeError(f"nvidia-smi error: {result.stderr.strip()}")
-
-        # Parse the output to extract memory values
-        memory_values = [
-            float(mem)
-            for mem in result.stdout.strip().split("\n")
-            if re.match(r"^\d+(\.\d+)?$", mem.strip())
-        ]
-
-        if not memory_values:
-            raise ValueError("No GPU memory values found.")
-
-        # Return the minimum memory value
-        return min(memory_values)
+            # On Jetson, the GPU shares the main system RAM.
+            # So, we retrieve the total RAM capacity.
+            if 'RAM' in jetson.stats and 'total' in jetson.stats['RAM']:
+                total_ram_mb = float(jetson.stats['RAM']['total'])
+                return total_ram_mb
+            else:
+                raise ValueError("Could not find 'RAM' total memory in jetson-stats output.")
 
     except FileNotFoundError:
+        # This specific FileNotFoundError might not occur for jtop directly,
+        # but a more general Exception can catch issues if jtop isn't installed
+        # or its daemon isn't running on the host.
         raise RuntimeError(
-            "nvidia-smi not found. Ensure NVIDIA drivers are installed and accessible."
+            "jetson-stats (jtop) library not found or daemon not running. "
+            "Ensure 'jetson-stats' is installed on the host and in the container, "
+            "and the jtop socket is mounted."
         )
+    except Exception as e:
+        raise RuntimeError(f"Error accessing Jetson GPU memory via jtop")
 
 
 def get_hpu_memory_capacity():
