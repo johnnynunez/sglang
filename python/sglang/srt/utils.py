@@ -1231,49 +1231,69 @@ def get_device_sm():
         return major * 10 + minor
     return 0
 
-
-import subprocess
-import re
-from jtop import jtop # Import the jtop library
+def is_jetson():
+    """Checks if the system is an NVIDIA Jetson device."""
+    return os.path.exists('/etc/nv_tegra_release')
 
 def get_nvgpu_memory_capacity():
     """
-    Retrieves the total available memory capacity for the GPU on Jetson Tegra Orin.
-    This uses jtop to get the total system RAM, as the iGPU on Jetson shares system memory.
+    Gets the total memory capacity of the GPU in MiB.
 
-    Returns:
-        float: The total memory capacity in MB.
-
-    Raises:
-        RuntimeError: If jetson-stats (jtop) cannot be accessed or provides no memory data.
+    This function is adapted to work robustly on both standard PCs with
+    NVIDIA GPUs and on NVIDIA Jetson devices. It explicitly checks for a
+    Jetson platform first.
     """
-    try:
-        with jtop() as jetson:
-            # Check if jtop has successfully initialized and is providing stats
-            if not jetson.ok():
-                raise RuntimeError("jetson-stats (jtop) is not running or accessible.")
+    # -----------------------------------------------------------------------
+    # 1. Explicitly check for Jetson platform
+    # -----------------------------------------------------------------------
+    if is_jetson():
+        try:
+            with open("/proc/meminfo") as f:
+                for line in f:
+                    if "MemTotal" in line:
+                        # Line is "MemTotal:       16343580 kB"
+                        # Value is in KiB, convert to MiB
+                        mem_total_kb = float(line.split()[1])
+                        return mem_total_kb / 1024
+            raise ValueError("Could not find MemTotal in /proc/meminfo on Jetson device.")
+        except Exception as e:
+            raise RuntimeError(
+                "Failed to read system memory from /proc/meminfo on a Jetson device."
+            ) from e
 
-            # On Jetson, the GPU shares the main system RAM.
-            # So, we retrieve the total RAM capacity.
-            if 'RAM' in jetson.stats and 'total' in jetson.stats['RAM']:
-                total_ram_mb = float(jetson.stats['RAM']['total'])
-                return total_ram_mb
-            else:
-                raise ValueError("Could not find 'RAM' total memory in jetson-stats output.")
+    # -----------------------------------------------------------------------
+    # 2. If not a Jetson, assume a discrete GPU and use nvidia-smi
+    # -----------------------------------------------------------------------
+    else:
+        try:
+            result = subprocess.run(
+                ["nvidia-smi", "--query-gpu=memory.total", "--format=csv,noheader,nounits"],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                check=True,  # Raises CalledProcessError for non-zero exit codes
+            )
 
-    except FileNotFoundError:
-        # This specific FileNotFoundError might not occur for jtop directly,
-        # but a more general Exception can catch issues if jtop isn't installed
-        # or its daemon isn't running on the host.
-        raise RuntimeError(
-            "jetson-stats (jtop) library not found or daemon not running. "
-            "Ensure 'jetson-stats' is installed on the host and in the container, "
-            "and the jtop socket is mounted."
-        )
-    except Exception as e:
-        raise RuntimeError(f"Error accessing Jetson GPU memory via jtop")
+            memory_values = [
+                float(mem)
+                for mem in result.stdout.strip().split("\n")
+                if re.match(r"^\d+(\.\d+)?$", mem.strip())
+            ]
 
+            if not memory_values:
+                # This should be rare with check=True, but as a safeguard:
+                raise ValueError("No GPU memory values found in nvidia-smi output.")
 
+            return min(memory_values)
+
+        except FileNotFoundError:
+            raise RuntimeError(
+                "Not a Jetson device and nvidia-smi was not found. "
+                "Ensure NVIDIA drivers are installed and in the system's PATH."
+            )
+        except subprocess.CalledProcessEror as e:
+            raise RuntimeError(f"nvidia-smi command failed: {e.stderr.strip()}")
+            
 def get_hpu_memory_capacity():
     try:
         # Run hl-smi and capture the output
