@@ -1259,7 +1259,7 @@ def get_nvgpu_memory_capacity():
         except Exception as e:
             raise RuntimeError(
                 "Failed to read system memory from /proc/meminfo on a Jetson device."
-            ) from e
+            )
 
     # -----------------------------------------------------------------------
     # 2. If not a Jetson, assume a discrete GPU and use nvidia-smi
