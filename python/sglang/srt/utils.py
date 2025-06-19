@@ -1260,7 +1260,6 @@ def get_nvgpu_memory_capacity():
             raise RuntimeError(
                 "Failed to read system memory from /proc/meminfo on a Jetson device."
             )
-
     # -----------------------------------------------------------------------
     # 2. If not a Jetson, assume a discrete GPU and use nvidia-smi
     # -----------------------------------------------------------------------
@@ -1291,9 +1290,7 @@ def get_nvgpu_memory_capacity():
                 "Not a Jetson device and nvidia-smi was not found. "
                 "Ensure NVIDIA drivers are installed and in the system's PATH."
             )
-        except subprocess.CalledProcessEror as e:
-            raise RuntimeError(f"nvidia-smi command failed: {e.stderr.strip()}")
-            
+
 def get_hpu_memory_capacity():
     try:
         # Run hl-smi and capture the output
