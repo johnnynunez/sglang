@@ -1400,65 +1400,45 @@ def get_device_sm():
         return major * 10 + minor
     return 0
 
-def is_jetson():
-    """Checks if the system is an NVIDIA Jetson device."""
-    return os.path.exists('/etc/nv_tegra_release')
 
 def get_nvgpu_memory_capacity():
-    """
-    Gets the total memory capacity of the GPU in MiB.
+    try:
+        # Run nvidia-smi and capture the output
+        result = subprocess.run(
+            ["nvidia-smi", "--query-gpu=memory.total", "--format=csv,noheader,nounits"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
 
-    This function is adapted to work robustly on both standard PCs with
-    NVIDIA GPUs and on NVIDIA Jetson devices. It explicitly checks for a
-    Jetson platform first.
-    """
-    # -----------------------------------------------------------------------
-    # 1. Explicitly check for Jetson platform
-    # -----------------------------------------------------------------------
-    if is_jetson():
-        try:
-            with open("/proc/meminfo") as f:
-                for line in f:
-                    if "MemTotal" in line:
-                        # Line is "MemTotal:       16343580 kB"
-                        # Value is in KiB, convert to MiB
-                        mem_total_kb = float(line.split()[1])
-                        return mem_total_kb / 1024
-            raise ValueError("Could not find MemTotal in /proc/meminfo on Jetson device.")
-        except Exception as e:
-            raise RuntimeError(
-                "Failed to read system memory from /proc/meminfo on a Jetson device."
-            )
-    # -----------------------------------------------------------------------
-    # 2. If not a Jetson, assume a discrete GPU and use nvidia-smi
-    # -----------------------------------------------------------------------
-    else:
-        try:
-            result = subprocess.run(
-                ["nvidia-smi", "--query-gpu=memory.total", "--format=csv,noheader,nounits"],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
-                check=True,  # Raises CalledProcessError for non-zero exit codes
-            )
+        if result.returncode != 0:
+            raise RuntimeError(f"nvidia-smi error: {result.stderr.strip()}")
 
-            memory_values = [
-                float(mem)
-                for mem in result.stdout.strip().split("\n")
-                if re.match(r"^\d+(\.\d+)?$", mem.strip())
-            ]
+        # Parse the output to extract memory values
+        memory_values = [
+            float(mem)
+            for mem in result.stdout.strip().split("\n")
+            if re.match(r"^\d+(\.\d+)?$", mem.strip())
+        ]
 
-            if not memory_values:
-                # This should be rare with check=True, but as a safeguard:
-                raise ValueError("No GPU memory values found in nvidia-smi output.")
+        if not memory_values:
+            # Fallback to torch.cuda.mem_get_info() when failed to get memory capacity from nvidia-smi,
+            # typically in NVIDIA MIG mode.
+            if torch.cuda.is_available():
+                logger.warning(
+                    "Failed to get GPU memory capacity from nvidia-smi, falling back to torch.cuda.mem_get_info()."
+                )
+                return torch.cuda.mem_get_info()[1] // 1024 // 1024  # unit: MB
+            raise ValueError("No GPU memory values found.")
 
-            return min(memory_values)
+        # Return the minimum memory value
+        return min(memory_values)
 
-        except FileNotFoundError:
-            raise RuntimeError(
-                "Not a Jetson device and nvidia-smi was not found. "
-                "Ensure NVIDIA drivers are installed and in the system's PATH."
-            )
+    except FileNotFoundError:
+        raise RuntimeError(
+            "nvidia-smi not found. Ensure NVIDIA drivers are installed and accessible."
+        )
+
 
 def get_hpu_memory_capacity():
     try:
@@ -2912,3 +2892,17 @@ def parse_module_path(module_path, function_name, create_dummy):
         return final_module, getattr(final_module, function_name)
 
     return final_module, None
+
+
+# LoRA-related constants and utilities
+SUPPORTED_LORA_TARGET_MODULES = [
+    "q_proj",
+    "k_proj",
+    "v_proj",
+    "o_proj",
+    "gate_proj",
+    "up_proj",
+    "down_proj",
+]
+
+LORA_TARGET_ALL_MODULES = "all"
