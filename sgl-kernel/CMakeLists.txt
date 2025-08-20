@@ -171,16 +171,24 @@ option(SGL_KERNEL_ENABLE_FA3              "Enable FA3"              OFF)
 if (ENABLE_BELOW_SM90)
     list(APPEND SGL_KERNEL_CUDA_FLAGS
         "-gencode=arch=compute_80,code=sm_80"
+        "-gencode=arch=compute_87,code=sm_87"
         "-gencode=arch=compute_89,code=sm_89"
     )
 endif()
-
+if ("${CUDA_VERSION}" VERSION_GREATER_EQUAL "13.0" OR SGL_KERNEL_ENABLE_SM100A)
+    list(APPEND SGL_KERNEL_CUDA_FLAGS
+        "-gencode=arch=compute_103,code=sm_103"
+        "-gencode=arch=compute_103a,code=sm_103a"
+        "-gencode=arch=compute_110,code=sm_110"
+        "-gencode=arch=compute_110a,code=sm_110a"
+        "-gencode=arch=compute_121,code=sm_121"
+        "-gencode=arch=compute_121a,code=sm_121a"
+    )
 if ("${CUDA_VERSION}" VERSION_GREATER_EQUAL "12.8" OR SGL_KERNEL_ENABLE_SM100A)
     list(APPEND SGL_KERNEL_CUDA_FLAGS
         "-gencode=arch=compute_100,code=sm_100"
         "-gencode=arch=compute_100a,code=sm_100a"
         "-gencode=arch=compute_101,code=sm_101"
-        "-gencode=arch=compute_101a,code=sm_101a"
         "-gencode=arch=compute_120,code=sm_120"
         "-gencode=arch=compute_120a,code=sm_120a"
     )
