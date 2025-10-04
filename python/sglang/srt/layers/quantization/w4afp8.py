@@ -300,18 +300,16 @@ class W4AFp8MoEMethod(FusedMoEMethodBase):
         topk_output = dispatch_output.topk_output
 
         topk_weights, topk_ids, _ = topk_output
-        local_topk_ids = topk_ids
+        """
         if get_moe_expert_parallel_world_size() > 1:
-            local_topk_ids = torch.where(
+            topk_ids = torch.where(
                 topk_ids == -1,
-                layer.num_experts,
+                layer.num_local_experts,
                 topk_ids,
             )
+        """
 
         output = cutlass_w4a8_moe(
-            layer.start_expert_id,
-            layer.end_expert_id,
-            layer.num_experts,
             x,
             layer.w13_weight,
             layer.w2_weight,
@@ -319,7 +317,6 @@ class W4AFp8MoEMethod(FusedMoEMethodBase):
             layer.w2_weight_scale_inv,
             topk_weights,
             topk_ids,
-            local_topk_ids,
             self.a_strides1,
             self.b_strides1,
             self.c_strides1,
