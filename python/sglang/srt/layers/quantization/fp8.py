@@ -1014,7 +1014,7 @@ class Fp8MoEMethod(FusedMoEMethodBase):
 
         self.moe_runner_config = moe_runner_config
         moe_runner_backend = get_moe_runner_backend()
-        
+
         if moe_runner_backend.is_auto():
             if deep_gemm_wrapper.ENABLE_JIT_DEEPGEMM and not _use_torch_compile:
                 moe_runner_backend = MoeRunnerBackend.DEEP_GEMM
