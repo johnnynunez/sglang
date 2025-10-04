@@ -94,9 +94,7 @@ class W4AFp8Config(QuantizationConfig):
         self, layer: torch.nn.Module, prefix: str
     ) -> Optional[QuantizeMethodBase]:
         from sglang.srt.layers.linear import LinearBase
-        from sglang.srt.layers.moe.ep_moe.layer import EPMoE
         from sglang.srt.layers.moe.fused_moe_triton import FusedMoE
-        from sglang.srt.managers.schedule_batch import global_server_args_dict
 
         if isinstance(layer, LinearBase):
             if is_layer_skipped(prefix, self.ignored_layers):
