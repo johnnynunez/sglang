@@ -106,6 +106,15 @@ class DeepEPMoE(FusedMoE):
             activation=activation,
             routed_scaling_factor=routed_scaling_factor,
         )
+        
+        if isinstance(quant_config, Fp8Config):
+            self.use_block_quant = getattr(self.quant_method, "block_quant", False)
+            self.use_fp8_w8a8 = True
+            self.fp8_dtype = torch.float8_e4m3fn
+        else:
+            self.use_fp8_w8a8 = False
+            self.use_block_quant = False
+
         self.deepep_mode = get_deepep_mode()
 
         # TODO: move to the beginning of the file
@@ -299,7 +308,6 @@ class DeepEPMoE(FusedMoE):
         N = self.w13_weight.size(1)
         scale_block_size = 128
 
-        # TODO also unify other branches (e.g. `EPMoE.forward_deepgemm` sets the field on forward pass)
         w13_weight_fp8 = (
             self.w13_weight,
             (

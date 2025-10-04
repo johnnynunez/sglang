@@ -21,7 +21,6 @@ from sglang.srt.utils import is_npu, set_weight_attrs
 
 if TYPE_CHECKING:
     from sglang.srt.layers.moe import MoeRunnerConfig
-    from sglang.srt.layers.moe.ep_moe.layer import EPMoE
     from sglang.srt.layers.moe.token_dispatcher import (
         CombineInput,
         StandardDispatchOutput,
@@ -131,7 +130,7 @@ class W4AFp8MoEMethod(FusedMoEMethodBase):
 
     def create_weights(
         self,
-        layer: EPMoE,
+        layer: Module,
         num_experts: int,
         hidden_size: int,
         intermediate_size_per_partition: int,
@@ -290,7 +289,7 @@ class W4AFp8MoEMethod(FusedMoEMethodBase):
 
     def apply(
         self,
-        layer: EPMoE,
+        layer: Module,
         dispatch_output: StandardDispatchOutput,
     ) -> CombineInput:
 
