@@ -103,6 +103,7 @@ _is_fp8_fnuz = is_fp8_fnuz()
 
 _use_hip_int4 = get_bool_env_var("SGLANG_INT4_WEIGHT")
 _use_aiter = get_bool_env_var("SGLANG_USE_AITER") and _is_hip
+_use_torch_compile = get_bool_env_var("SGLANG_ENABLE_TORCH_COMPILE")
 
 if _is_hip and (_use_aiter or _use_hip_int4):
     from aiter import ActivationType, QuantType
@@ -1013,13 +1014,12 @@ class Fp8MoEMethod(FusedMoEMethodBase):
 
         self.moe_runner_config = moe_runner_config
         moe_runner_backend = get_moe_runner_backend()
-
+        
         if moe_runner_backend.is_auto():
-            if deep_gemm_wrapper.ENABLE_JIT_DEEPGEMM:
+            if deep_gemm_wrapper.ENABLE_JIT_DEEPGEMM and not _use_torch_compile:
                 moe_runner_backend = MoeRunnerBackend.DEEP_GEMM
             else:
                 moe_runner_backend = MoeRunnerBackend.TRITON
-
         if moe_runner_backend.is_deep_gemm() or moe_runner_backend.is_triton():
             self.runner = MoeRunner(moe_runner_backend, moe_runner_config)
         else:
