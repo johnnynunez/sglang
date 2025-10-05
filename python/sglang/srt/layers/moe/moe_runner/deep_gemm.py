@@ -293,7 +293,7 @@ def post_permute_deep_gemm_to_standard(
         hidden_states_shape[1],
         BLOCK_SIZE=512,
     )
-    
+
     dispose_tensor(runner_output.hidden_states)
 
     if runner_config.routed_scaling_factor is not None:

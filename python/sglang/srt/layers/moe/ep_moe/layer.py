@@ -106,7 +106,7 @@ class DeepEPMoE(FusedMoE):
             activation=activation,
             routed_scaling_factor=routed_scaling_factor,
         )
-        
+
         if isinstance(quant_config, Fp8Config):
             self.use_block_quant = getattr(self.quant_method, "block_quant", False)
             self.use_fp8_w8a8 = True
