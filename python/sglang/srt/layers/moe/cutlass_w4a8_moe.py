@@ -103,6 +103,7 @@ def cutlass_w4a8_moe(
         assert topk == 1, "apply_router_weight_on_input is only implemented for topk=1"
 
     device = a.device
+    topk_ids[topk_ids == -1] = num_local_experts
 
     _, src2dst, _ = run_moe_ep_preproess(
         topk_ids,
@@ -121,6 +122,7 @@ def cutlass_w4a8_moe(
         src2dst,
         topk_ids,
         a1_scale,
+        num_local_experts,
         topk,
         k,
         BLOCK_SIZE=512,
@@ -132,7 +134,7 @@ def cutlass_w4a8_moe(
     a_map = torch.empty((topk_ids.numel()), dtype=torch.int32, device=device)
     c_map = torch.empty((topk_ids.numel()), dtype=torch.int32, device=device)
     get_cutlass_w4a8_moe_mm_data(
-        torch.where(topk_ids >= 0, topk_ids, num_local_experts),
+        topk_ids,
         expert_offsets,
         problem_sizes1,
         problem_sizes2,
@@ -194,6 +196,7 @@ def cutlass_w4a8_moe(
         topk_ids,
         topk_weights,
         topk,
+        num_local_experts,
         k,
         BLOCK_SIZE=512,
     )

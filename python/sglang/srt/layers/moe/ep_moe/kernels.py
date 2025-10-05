@@ -173,6 +173,7 @@ def pre_reorder_triton_kernel_for_cutlass_moe(
     src2dst_ptr,
     topk_ids_ptr,
     a1_scales_ptr,
+    num_local_experts,
     topk,
     hidden_size,
     BLOCK_SIZE: tl.constexpr,
@@ -189,7 +190,7 @@ def pre_reorder_triton_kernel_for_cutlass_moe(
 
     for idx in range(topk):
         expert_id = tl.load(topk_ids_ptr + idx)
-        if expert_id >= 0:
+        if expert_id != num_local_experts:
             if a1_scales_ptr is not None:
                 scale = 1.0 / tl.load(a1_scales_ptr)
             else:
@@ -454,6 +455,7 @@ def post_reorder_triton_kernel(
     topk_ids_ptr,
     topk_weights_ptr,
     topk,
+    num_local_experts,
     hidden_size,
     BLOCK_SIZE: tl.constexpr,
 ):
@@ -476,7 +478,7 @@ def post_reorder_triton_kernel(
         sum_vec = tl.zeros([BLOCK_SIZE], dtype=InDtype)
         for idx in range(topk):
             expert_id = tl.load(topk_ids_ptr + idx)
-            if expert_id >= 0:
+            if expert_id != num_local_experts:
                 dst_idx_int32 = tl.load(src2dst_ptr + idx)
                 dst_idx = dst_idx_int32.to(tl.int64)
                 weigh_scale = tl.load(topk_weights_ptr + idx).to(InDtype)
