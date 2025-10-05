@@ -14,8 +14,6 @@ from sglang.srt.layers.moe import (
 from sglang.srt.layers.moe.ep_moe.kernels import (
     ep_gather,
     ep_scatter,
-    moe_ep_deepgemm_preprocess,
-    post_reorder_triton_kernel,
     silu_and_mul_masked_post_quant_fwd,
     tma_align_input_scale,
 )
@@ -34,13 +32,7 @@ from sglang.srt.layers.quantization.modelopt_quant import (
 from sglang.srt.model_executor.forward_batch_info import ForwardBatch
 from sglang.srt.offloader import get_offloader
 from sglang.srt.single_batch_overlap import DownGemmOverlapArgs
-from sglang.srt.utils import (
-    ceil_div,
-    dispose_tensor,
-    get_bool_env_var,
-    is_hip,
-    is_npu,
-)
+from sglang.srt.utils import ceil_div, dispose_tensor, get_bool_env_var, is_hip, is_npu
 
 if TYPE_CHECKING:
     from sglang.srt.layers.moe.token_dispatcher import (
