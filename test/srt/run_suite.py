@@ -13,7 +13,6 @@ class TestFile:
 
 suites = {
     "per-commit": [
-        TestFile("ep/test_moe_ep.py", 30),
         TestFile("function_call/test_json_schema_constraint.py", 30),
         TestFile("hicache/test_hicache.py", 116),
         TestFile("hicache/test_hicache_mla.py", 127),
@@ -126,6 +125,7 @@ suites = {
         TestFile("test_vision_openai_server_b.py", 446),
     ],
     "per-commit-2-gpu": [
+        TestFile("ep/test_moe_ep.py", 140),
         TestFile("lora/test_lora_tp.py", 116),
         TestFile("rl/test_update_weights_from_distributed.py", 103),
         TestFile("test_data_parallelism.py", 73),
