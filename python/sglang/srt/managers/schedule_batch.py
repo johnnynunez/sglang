@@ -97,7 +97,7 @@ GLOBAL_SERVER_ARGS_KEYS = [
     "ep_num_redundant_experts",
     "enable_nan_detection",
     "flashinfer_mla_disable_ragged",
-    "max_micro_batch_size",
+    "pp_max_micro_batch_size",
     "disable_shared_experts_fusion",
     "sampling_backend",
     "speculative_accept_threshold_single",
@@ -112,6 +112,8 @@ GLOBAL_SERVER_ARGS_KEYS = [
     "enable_custom_logit_processor",
     "disaggregation_mode",
     "enable_deterministic_inference",
+    "nsa_prefill",
+    "nsa_decode",
 ]
 
 # Put some global args for easy access
@@ -663,7 +665,11 @@ class Req:
     @property
     def is_prefill_only(self) -> bool:
         """Check if this request is prefill-only (no token generation needed)."""
-        return self.sampling_params.max_new_tokens == 0
+        # NOTE: when spec is enabled, prefill_only optimizations are disabled
+        return (
+            self.sampling_params.max_new_tokens == 0
+            and global_server_args_dict["speculative_algorithm"] is None
+        )
 
     def add_latency(self, stage: RequestStage):
         if self.metrics_collector is None:
@@ -858,10 +864,6 @@ class Req:
             f"{self.grammar=}, "
             f"{self.sampling_params=})"
         )
-
-
-# Batch id
-bid = 0
 
 
 @dataclasses.dataclass
@@ -1229,7 +1231,7 @@ class ScheduleBatch(ScheduleBatchDisaggregationDecodeMixin):
         seq_lens_tensor = torch.tensor(seq_lens, dtype=torch.int64).to(
             self.device, non_blocking=True
         )
-        seq_lens_cpu_tensor = torch.tensor(seq_lens, dtype=torch.int64)
+        seq_lens_cpu = torch.tensor(seq_lens, dtype=torch.int64)
         orig_seq_lens_tensor = torch.tensor(orig_seq_lens, dtype=torch.int32).to(
             self.device, non_blocking=True
         )
@@ -1366,7 +1368,7 @@ class ScheduleBatch(ScheduleBatchDisaggregationDecodeMixin):
                 prefix_lens_tensor,
                 prefix_lens_cpu_tensor,
                 seq_lens_tensor,
-                seq_lens_cpu_tensor,
+                seq_lens_cpu,
                 last_loc,
                 extend_num_tokens,
             )
@@ -1375,7 +1377,7 @@ class ScheduleBatch(ScheduleBatchDisaggregationDecodeMixin):
         self.input_ids = input_ids_tensor
         self.req_pool_indices = req_pool_indices_tensor
         self.seq_lens = seq_lens_tensor
-        self.seq_lens_cpu = seq_lens_cpu_tensor
+        self.seq_lens_cpu = seq_lens_cpu
         self.orig_seq_lens = orig_seq_lens_tensor
         self.out_cache_loc = out_cache_loc
         self.input_embeds = (
@@ -1829,10 +1831,7 @@ class ScheduleBatch(ScheduleBatchDisaggregationDecodeMixin):
             seq_lens_cpu_cache if seq_lens_cpu_cache is not None else self.seq_lens_cpu
         )
 
-        global bid
-        bid += 1
         return ModelWorkerBatch(
-            bid=bid,
             forward_mode=self.forward_mode,
             input_ids=self.input_ids,
             req_pool_indices=self.req_pool_indices,
@@ -1952,8 +1951,6 @@ class ScheduleBatch(ScheduleBatchDisaggregationDecodeMixin):
 
 @dataclasses.dataclass
 class ModelWorkerBatch:
-    # The batch id
-    bid: int
     # The forward mode
     forward_mode: ForwardMode
     # The input ids
